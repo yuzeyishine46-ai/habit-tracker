@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="習慣追蹤" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <title>習慣追蹤</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #141414;
+      --surface2: #1a1a1a;
+      --border: #1e1e1e;
+      --text: #f0ede8;
+      --muted: #666;
+      --dim: #333;
+      --green: #4ade80;
+      --blue: #60a5fa;
+      --amber: #f59e0b;
+      --pink: #f472b6;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans TC', 'Hiragino Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    #app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      padding-bottom: 96px;
+    }
+
+    /* Header */
+    .header {
+      padding: 48px 24px 16px;
+      animation: fadeDown 0.5s ease both;
+    }
+    .header-label {
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .header-title {
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: -1px;
+    }
+
+    /* Progress */
+    .progress-area {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-top: 24px;
+    }
+    .ring-wrap {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      flex-shrink: 0;
+    }
+    .ring-wrap svg { transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: #1e1e1e; stroke-width: 6; }
+    .ring-fill {
+      fill: none; stroke: var(--green); stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 188.5;
+      stroke-dashoffset: 188.5;
+      transition: stroke-dashoffset 0.7s cubic-bezier(.4,0,.2,1);
+    }
+    .ring-label {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 900;
+    }
+    .progress-text { font-size: 22px; font-weight: 700; }
+    .progress-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      padding: 16px 24px 0;
+      gap: 4px;
+      animation: fadeDown 0.5s 0.1s ease both;
+    }
+    .tab {
+      padding: 9px 22px;
+      border-radius: 40px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all 0.2s;
+      background: transparent;
+      color: var(--muted);
+    }
+    .tab.active { background: var(--text); color: var(--bg); }
+
+    /* Habit list */
+    .habit-list {
+      padding: 16px 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 56px 0;
+      color: #444;
+      border: 1px dashed #222;
+      border-radius: 18px;
+      animation: fadeUp 0.4s ease both;
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 10px; }
+    .empty-text { font-size: 14px; }
+
+    .habit-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      transition: border-color 0.3s, background 0.3s;
+      animation: fadeUp 0.3s ease both;
+    }
+    .habit-card.done { background: #111; }
+
+    /* Today view */
+    .today-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .check-btn {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      border: 2px solid var(--dim);
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      transition: all 0.25s;
+      color: transparent;
+    }
+    .check-btn.done {
+      color: #000;
+    }
+    .habit-name {
+      font-size: 15px;
+      font-weight: 600;
+      flex: 1;
+      transition: color 0.2s, text-decoration 0.2s;
+    }
+    .habit-name.done {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+    .habit-meta { font-size: 11px; color: #444; margin-top: 3px; }
+    .del-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--dim); font-size: 20px; padding: 4px;
+      line-height: 1; flex-shrink: 0;
+      transition: color 0.2s;
+    }
+    .del-btn:hover { color: #888; }
+
+    /* Week view */
+    .week-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .week-name { font-size: 14px; font-weight: 700; }
+    .week-score { margin-left: auto; font-size: 12px; font-weight: 700; }
+    .week-grid { display: flex; gap: 6px; }
+    .day-col { flex: 1; text-align: center; }
+    .day-label { font-size: 9px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+    .day-label.today { color: inherit; }
+    .day-btn {
+      width: 100%; aspect-ratio: 1;
+      border-radius: 8px;
+      border: 1.5px solid #222;
+      background: transparent;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      color: var(--dim);
+      transition: all 0.2s;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal {
+      background: #141414;
+      border-radius: 24px 24px 0 0;
+      padding: 28px 24px max(24px, env(safe-area-inset-bottom));
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      border: 1px solid #222;
+      border-bottom: none;
+      animation: slideUp 0.3s cubic-bezier(.4,0,.2,1);
+    }
+    .modal-title { font-size: 17px; font-weight: 800; margin-bottom: 20px; }
+
+    .input-field {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 13px 16px;
+      color: var(--text);
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      margin-bottom: 18px;
+      transition: border-color 0.2s;
+    }
+    .input-field:focus { border-color: #444; }
+    .input-field::placeholder { color: #444; }
+
+    .section-label { font-size: 11px; color: var(--muted); margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; }
+
+    .cat-grid { display: flex; gap: 8px; margin-bottom: 24px; }
+    .cat-btn {
+      flex: 1; padding: 12px 4px;
+      border-radius: 14px;
+      border: 1.5px solid #222;
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: inherit;
+      color: var(--muted);
+      transition: all 0.2s;
+    }
+    .cat-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+    .btn-row { display: flex; gap: 10px; }
+    .btn-cancel {
+      flex: 1; padding: 15px;
+      border-radius: 14px;
+      border: 1px solid #222;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+    }
+    .btn-add {
+      flex: 2; padding: 15px;
+      border-radius: 14px;
+      border: none;
+      background: var(--text);
+      color: var(--bg);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 800;
+      font-family: inherit;
+      transition: opacity 0.2s;
+    }
+    .btn-add:active { opacity: 0.8; }
+
+    /* FAB */
+    .fab {
+      position: fixed;
+      bottom: max(28px, env(safe-area-inset-bottom));
+      right: 24px;
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      background: var(--text);
+      border: none;
+      cursor: pointer;
+      font-size: 28px;
+      color: var(--bg);
+      box-shadow: 0 4px 28px rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 300;
+      transition: transform 0.2s, box-shadow 0.2s;
+      z-index: 100;
+    }
+    .fab:active { transform: scale(0.93); }
+
+    @keyframes fadeDown { from { opacity:0; transform: translateY(-12px); } to { opacity:1; transform: translateY(0); } }
+    @keyframes fadeUp   { from { opacity:0; transform: translateY(12px); }  to { opacity:1; transform: translateY(0); } }
+    @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+    @keyframes slideUp  { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    /* Install banner */
+    .install-banner {
+      margin: 16px 24px 0;
+      background: #1a1a0e;
+      border: 1px solid #f59e0b44;
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: fadeUp 0.5s 0.3s ease both;
+    }
+    .install-text { font-size: 12px; color: #aaa; flex: 1; line-height: 1.5; }
+    .install-text strong { color: var(--amber); }
+    .install-close {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 18px; padding: 2px;
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const CATEGORIES = [
+  { id: "health", label: "健康", color: "#4ade80", icon: "🌿" },
+  { id: "mind",   label: "心智", color: "#60a5fa", icon: "🧠" },
+  { id: "work",   label: "工作", color: "#f59e0b", icon: "⚡" },
+  { id: "life",   label: "生活", color: "#f472b6", icon: "✨" },
+];
+const DAYS_ZH = ["一","二","三","四","五","六","日"];
+const STORAGE_KEY = "habit-tracker-v1";
+
+let state = {
+  habits: [],
+  completions: {},
+  tab: "today",
+  showAdd: false,
+  newName: "",
+  newCat: "health",
+  showBanner: true,
+};
+
+function getTodayKey() {
+  return new Date().toISOString().split("T")[0];
+}
+function getWeekKeys() {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  return Array.from({length:7}, (_,i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.toISOString().split("T")[0];
+  });
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      state.habits = d.habits || [];
+      state.completions = d.completions || {};
+    }
+  } catch(e) {}
+}
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      habits: state.habits,
+      completions: state.completions,
+    }));
+  } catch(e) {}
+}
+
+function isCompleted(hid, dk) { return !!state.completions[`${hid}:${dk}`]; }
+function toggle(hid, dk) {
+  const k = `${hid}:${dk}`;
+  state.completions[k] = !state.completions[k];
+  save(); render();
+}
+function getWeekStreak(hid) {
+  return getWeekKeys().filter(d => isCompleted(hid, d)).length;
+}
+function getProgress() {
+  if (!state.habits.length) return 0;
+  const done = state.habits.filter(h => isCompleted(h.id, getTodayKey())).length;
+  return Math.round(done / state.habits.length * 100);
+}
+function addHabit() {
+  const name = state.newName.trim();
+  if (!name) return;
+  state.habits.push({ id: Date.now().toString(), name, category: state.newCat, createdAt: getTodayKey() });
+  state.newName = ""; state.showAdd = false;
+  save(); render();
+}
+function deleteHabit(id) {
+  state.habits = state.habits.filter(h => h.id !== id);
+  save(); render();
+}
+function cat(id) { return CATEGORIES.find(c => c.id === id) || CATEGORIES[0]; }
+
+function render() {
+  const todayKey = getTodayKey();
+  const weekKeys = getWeekKeys();
+  const progress = getProgress();
+  const pct = 2 * Math.PI * 30;
+  const offset = pct * (1 - progress / 100);
+  const doneCnt = state.habits.filter(h => isCompleted(h.id, todayKey)).length;
+  const emoji = progress === 100 ? "🎉 全部完成！太棒了！" : progress >= 50 ? "⚡ 繼續加油！" : "🌱 今天剛開始";
+
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+  document.getElementById("app").innerHTML = `
+    <div class="header">
+      <div class="header-label">習慣追蹤</div>
+      <h1 class="header-title">今日清單</h1>
+      <div class="progress-area">
+        <div class="ring-wrap">
+          <svg width="72" height="72" viewBox="0 0 72 72">
+            <circle class="ring-bg" cx="36" cy="36" r="30"/>
+            <circle class="ring-fill" cx="36" cy="36" r="30"
+              style="stroke:${progress===100?'#4ade80':'#4ade80'};stroke-dashoffset:${offset}"/>
+          </svg>
+          <div class="ring-label">${progress}%</div>
+        </div>
+        <div>
+          <div class="progress-text">${doneCnt}<span style="font-size:13px;color:#666;font-weight:400"> / ${state.habits.length} 完成</span></div>
+          <div class="progress-sub">${emoji}</div>
+        </div>
+      </div>
+    </div>
+
+    ${state.showBanner && isIos && !isStandalone ? `
+    <div class="install-banner">
+      <div class="install-text">
+        <strong>📲 加到主畫面</strong><br>
+        點 Safari 的 <strong>分享按鈕 →「加入主畫面」</strong>，就能像 App 一樣使用！
+      </div>
+      <button class="install-close" onclick="closeBanner()">×</button>
+    </div>` : ''}
+
+    <div class="tabs">
+      <button class="tab ${state.tab==='today'?'active':''}" onclick="setTab('today')">今天</button>
+      <button class="tab ${state.tab==='week'?'active':''}" onclick="setTab('week')">本週</button>
+    </div>
+
+    <div class="habit-list">
+      ${state.habits.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon">🌱</div>
+          <div class="empty-text">還沒有習慣，點下方 + 開始建立</div>
+        </div>
+      ` : state.habits.map((h, i) => {
+        const c = cat(h.category);
+        const done = isCompleted(h.id, todayKey);
+        const streak = getWeekStreak(h.id);
+
+        if (state.tab === 'today') {
+          return `
+          <div class="habit-card ${done?'done':''}" style="border-color:${done?c.color+'44':'#1e1e1e'};animation-delay:${i*0.05}s">
+            <div class="today-row">
+              <button class="check-btn ${done?'done':''}"
+                onclick="toggle('${h.id}','${todayKey}')"
+                style="border-color:${done?c.color:'#333'};background:${done?c.color:'transparent'}">
+                ${done?'✓':''}
+              </button>
+              <div style="flex:1;min-width:0">
+                <div class="habit-name ${done?'done':''}">${h.name}</div>
+                <div class="habit-meta"><span style="color:${c.color}">${c.icon}</span> ${c.label} · 本週 ${streak}/7</div>
+              </div>
+              <button class="del-btn" onclick="deleteHabit('${h.id}')">×</button>
+            </div>
+          </div>`;
+        } else {
+          return `
+          <div class="habit-card" style="animation-delay:${i*0.05}s">
+            <div class="week-header">
+              <span style="font-size:14px">${c.icon}</span>
+              <span class="week-name">${h.name}</span>
+              <span class="week-score" style="color:${c.color}">${streak}/7</span>
+            </div>
+            <div class="week-grid">
+              ${weekKeys.map((d,di) => {
+                const checked = isCompleted(h.id, d);
+                const isToday = d === todayKey;
+                return `
+                <div class="day-col">
+                  <div class="day-label ${isToday?'today':''}" style="${isToday?'color:'+c.color:''}">${DAYS_ZH[di]}</div>
+                  <button class="day-btn"
+                    onclick="toggle('${h.id}','${d}')"
+                    style="border-color:${checked?c.color:'#222'};background:${checked?c.color+'33':'transparent'};color:${checked?c.color:'#333'}">
+                    ${checked?'✓':''}
+                  </button>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }
+      }).join('')}
+    </div>
+
+    ${state.showAdd ? `
+    <div class="modal-overlay" onclick="overlayClick(event)">
+      <div class="modal">
+        <div class="modal-title">新增習慣</div>
+        <input class="input-field" id="habit-input"
+          placeholder="例如：喝水 2000ml、冥想 10 分鐘"
+          value="${escHtml(state.newName)}"
+          oninput="state.newName=this.value"
+          onkeydown="if(event.key==='Enter')addHabit()"
+          autofocus />
+        <div class="section-label">分類</div>
+        <div class="cat-grid">
+          ${CATEGORIES.map(c => `
+            <button class="cat-btn" onclick="setCat('${c.id}')"
+              style="border-color:${state.newCat===c.id?c.color:'#222'};background:${state.newCat===c.id?c.color+'22':'transparent'};color:${state.newCat===c.id?c.color:'#666'}">
+              <span class="cat-icon">${c.icon}</span>${c.label}
+            </button>`).join('')}
+        </div>
+        <div class="btn-row">
+          <button class="btn-cancel" onclick="closeAdd()">取消</button>
+          <button class="btn-add" onclick="addHabit()">新增習慣</button>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <button class="fab" onclick="openAdd()">+</button>
+  `;
+
+  // Focus input if modal just opened
+  if (state.showAdd) {
+    setTimeout(() => {
+      const inp = document.getElementById("habit-input");
+      if (inp) inp.focus();
+    }, 50);
+  }
+}
+
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function setTab(t) { state.tab = t; render(); }
+function openAdd() { state.showAdd = true; render(); }
+function closeAdd() { state.showAdd = false; render(); }
+function setCat(c) { state.newCat = c; render(); }
+function overlayClick(e) { if (e.target === e.currentTarget) closeAdd(); }
+function closeBanner() { state.showBanner = false; render(); }
+
+// Make global
+window.toggle = toggle;
+window.deleteHabit = deleteHabit;
+window.setTab = setTab;
+window.openAdd = openAdd;
+window.closeAdd = closeAdd;
+window.setCat = setCat;
+window.addHabit = addHabit;
+window.overlayClick = overlayClick;
+window.closeBanner = closeBanner;
+window.state = state;
+
+load();
+render();
+</script>
+</body>
+</html>
