@@ -166,7 +166,7 @@ function App() {
       });
       const r=await fetch(WORKER+"/records?date="+todayKey()).then(x=>x.json());
       setNrecords(Array.isArray(r)?r:[]);
-    } catch(e){ setNerror("認領失敗，請重試"); }
+    } catch(e){ setNerror("承接失敗，請重試"); }
   }
 
   async function completeTask(record) {
@@ -305,27 +305,33 @@ function App() {
   const [inputId, setInputId] = useState("");
   if(!gameId) return (
     <div style={{...s.app, display:"flex", flexDirection:"column", alignItems:"center",
-      justifyContent:"center", padding:"40px 28px", gap:24}}>
+      justifyContent:"flex-start", paddingTop:"18vh", padding:"18vh 28px 40px", gap:20}}>
       <style>{`@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}`}</style>
-      {kImg(100,112)}
-      <div style={{...s.bubble, borderRadius:16, textAlign:"center", maxWidth:280}}>
-        <strong>小K：</strong>歡迎來到任務系統！<br/>
-        <span style={{fontWeight:400,opacity:.75}}>請輸入你的遊戲 ID，<br/>我會記住你的！</span>
+      {/* 小K + 對話 並排 */}
+      <div style={{display:"flex", alignItems:"center", gap:14, maxWidth:320, width:"100%"}}>
+        {kImg(80,90)}
+        <div style={{flex:1}}>
+          <div style={{fontSize:16, fontWeight:900, color:C.txt, marginBottom:4}}>小K：歡迎來到任務系統！</div>
+          <div style={{fontSize:13, color:C.mut, lineHeight:1.6}}>請輸入你的遊戲 ID，<br/>我會記住你的！</div>
+        </div>
       </div>
-      <ChineseInput
-        style={{...s.ifield, marginBottom:0, textAlign:"center", fontSize:18, fontWeight:900,
-          borderRadius:16, padding:"14px 20px", maxWidth:280, width:"100%"}}
-        placeholder="輸入你的 ID..."
-        initialValue={inputId}
-        onValueChange={setInputId}
-        onEnter={()=>{ if(inputId.trim()){ localStorage.setItem("k-gameid",inputId.trim()); setGameId(inputId.trim()); } }}
-        autoFocus
-      />
-      <button
-        onClick={()=>{ if(inputId.trim()){ localStorage.setItem("k-gameid",inputId.trim()); setGameId(inputId.trim()); } }}
-        style={{...s.bsave, flex:"none", padding:"14px 40px", borderRadius:14, fontSize:15}}>
-        開始冒險 🎮
-      </button>
+      {/* 輸入框 + 按鈕 */}
+      <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:12, width:"100%", maxWidth:280}}>
+        <ChineseInput
+          style={{...s.ifield, marginBottom:0, textAlign:"center", fontSize:18, fontWeight:900,
+            borderRadius:16, padding:"14px 20px", width:"100%"}}
+          placeholder="輸入你的 ID..."
+          initialValue={inputId}
+          onValueChange={setInputId}
+          onEnter={()=>{ if(inputId.trim()){ localStorage.setItem("k-gameid",inputId.trim()); setGameId(inputId.trim()); } }}
+          autoFocus
+        />
+        <button
+          onClick={()=>{ if(inputId.trim()){ localStorage.setItem("k-gameid",inputId.trim()); setGameId(inputId.trim()); } }}
+          style={{...s.bsave, flex:"none", padding:"14px 0", borderRadius:14, fontSize:15, width:"100%"}}>
+          開始冒險 🎮
+        </button>
+      </div>
     </div>
   );
 
@@ -596,6 +602,25 @@ function App() {
           </div>
         </div>
       )}
+      {/* 目前被承接的任務（所有人） */}
+      {nrecords.filter(r=>r.status==="認領中"&&r.player!==name).length>0&&(
+        <div style={{padding:"12px 20px 0"}}>
+          <div style={{fontSize:11,fontWeight:900,color:"#7c3aed",letterSpacing:1,marginBottom:8}}>⚡ 目前被承接的任務</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {nrecords.filter(r=>r.status==="認領中"&&r.player!==name).map(r=>(
+              <div key={r.id} style={{...s.card("#e9d5ff"),background:"#faf5ff",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:20,flexShrink:0}}>{TYPE_ICON["其他"]}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700}}>{r.taskName}</div>
+                  <div style={{fontSize:11,color:"#7c3aed",marginTop:1}}>+{r.score} 積分</div>
+                </div>
+                <span style={{fontSize:12,fontWeight:700,color:"#7c3aed",background:"#ede9fe",
+                  padding:"3px 8px",borderRadius:8}}>{r.player}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* 今日完成 */}
       {nrecords.filter(r=>r.status==="已完成").length>0&&(
         <div style={{padding:"12px 20px 0"}}>
@@ -633,7 +658,7 @@ function App() {
                   </div>
                 </div>
                 <button onClick={()=>claimTask(task)} style={{padding:"8px 14px",borderRadius:10,border:"none",
-                  background:C.txt,color:"#f0f4f8",fontSize:12,fontWeight:900,cursor:"pointer",flexShrink:0}}>認領</button>
+                  background:C.txt,color:"#f0f4f8",fontSize:12,fontWeight:900,cursor:"pointer",flexShrink:0}}>承接任務</button>
               </div>
             ))}
           </div>
