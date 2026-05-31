@@ -255,7 +255,14 @@ function App(){
 
   // Login
   if(!gameId){
-    function doLogin(){var id=inputId.trim();if(id){localStorage.setItem("k-gameid",id);setGameId(id);}}
+    function doLogin(){
+  var id=inputId.trim();
+  if(!id)return;
+  localStorage.setItem("k-gameid",id);
+  setGameId(id);
+  // 自動在 Notion 建立玩家記錄（如果不存在）
+  fetch(WORKER+"/players",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:id})}).catch(function(){});
+}
     return e("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:"15vh",gap:20,minHeight:"100dvh",background:C.bg,padding:"15vh 28px 40px"}},
       e("div",{style:{display:"flex",alignItems:"center",gap:14,maxWidth:320,width:"100%"}},
         kImg(80,90),
