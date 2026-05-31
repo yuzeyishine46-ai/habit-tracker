@@ -177,6 +177,8 @@ function App(){
   var s18=useState({name:"",type:"家事",score:10,period:"每日",desc:"",active:true}),teamForm=s18[0],setTeamForm=s18[1];
   var s19=useState(null),teamEditId=s19[0],setTeamEditId=s19[1];
   var s20=useState(""),inputId=s20[0],setInputId=s20[1];
+  var s21=useState(false),editingId=s21[0],setEditingId=s21[1];
+  var s22=useState(""),newIdInput=s22[0],setNewIdInput=s22[1];
 
   useEffect(function(){
     try{var r=localStorage.getItem(SK);if(r){var d=JSON.parse(r);setHabits(d.habits||[]);setDone(d.done||{});}}catch(ex){}
@@ -251,6 +253,16 @@ function App(){
   function deleteHabit(id){setHabits(function(prev){var nh=prev.filter(function(h){return h.id!==id;});persist(nh,done);return nh;});}
   function openEdit(id){var h=habits.find(function(x){return x.id===id;});if(!h)return;setEditId(id);setForm({name:h.name,cat:h.category,freq:h.freq||"everyday",wdays:h.wdays?h.wdays.slice():[],date:h.date||"",mday:h.mday||1,urgent:!!h.urgent});setModal2(true);}
   function openAdd(){setEditId(null);setForm(Object.assign({},EMPTY_F,{wdays:[]}));setModal2(true);}
+  function saveNewId(){
+    var id=newIdInput.trim();
+    if(!id)return;
+    localStorage.setItem("k-gameid",id);
+    setGameId(id);
+    setEditingId(false);
+    setNewIdInput("");
+    // 在 Notion 建立新 ID 的積分記錄
+    fetch(WORKER+"/players",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:id})}).catch(function(){});
+  }
   function toggleWday(d){setForm(function(f){var w=f.wdays.includes(d)?f.wdays.filter(function(x){return x!==d;}):f.wdays.concat([d]);return Object.assign({},f,{wdays:w});});}
 
   // Login
@@ -652,6 +664,33 @@ function App(){
   function ManagePage(){
     return e("div",null,
       e("div",{style:{padding:"44px 20px 14px"}},e("div",{style:{fontSize:24,fontWeight:900}},"任務管理"),e("div",{style:{fontSize:13,color:C.mut,marginTop:3}},"管理個人與團隊任務")),
+      // 遊戲 ID 設定
+      e("div",{style:{margin:"0 20px 16px",background:C.sur,border:"1.5px solid "+C.bdr,borderRadius:16,padding:"14px 16px"}},
+        e("div",{style:{fontSize:10,color:C.mut,letterSpacing:2,textTransform:"uppercase",marginBottom:8}},"遊戲 ID"),
+        editingId
+          ? e("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+              e(ChineseInput,{
+                style:Object.assign({},ifd,{marginBottom:0,flex:1,fontSize:15}),
+                placeholder:"輸入新的遊戲 ID...",
+                initialValue:newIdInput,
+                onValueChange:setNewIdInput,
+                onEnter:saveNewId,
+                autoFocus:true
+              }),
+              e("button",{onClick:saveNewId,style:{padding:"10px 16px",borderRadius:10,border:"none",background:C.txt,color:"#f0f4f8",fontSize:13,fontWeight:900,fontFamily:"inherit",cursor:"pointer",flexShrink:0}},"確認"),
+              e("button",{onClick:function(){setEditingId(false);setNewIdInput("");},style:{padding:"10px 12px",borderRadius:10,border:"1.5px solid "+C.bdr,background:"transparent",color:C.mut,fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer",flexShrink:0}},"取消")
+            )
+          : e("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+              e("div",null,
+                e("span",{style:{fontSize:18,fontWeight:900,color:C.txt}},gameId),
+                e("span",{style:{fontSize:11,color:C.mut,marginLeft:8}},"目前的遊戲 ID")
+              ),
+              e("button",{
+                onClick:function(){setNewIdInput(gameId);setEditingId(true);},
+                style:{padding:"7px 14px",borderRadius:9,border:"1.5px solid "+C.bdr,background:"transparent",color:C.mut,fontSize:12,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}
+              },"✎ 修改")
+            )
+      ),
       e("div",{style:{display:"flex",padding:"0 20px",gap:6,marginBottom:14}},
         e("button",{style:ts(manageTab==="personal"),onClick:function(){setManageTab("personal");}},"個人任務"),
         e("button",{style:ts(manageTab==="team"),onClick:function(){setManageTab("team");}},"團隊任務")
