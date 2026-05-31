@@ -46,6 +46,8 @@ const CATS = [
 const DZ = ["一","二","三","四","五","六","日"];
 const MZ = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 const SK = "habit-k-v6";
+const WORKER = "https://notion-proxy.yuzeyishine46.workers.dev";
+const PLAYERS = ["Jz", "月月"];
 const MSGS = [
   ["新的一天開始了！","今日任務已解鎖，冒險者，準備好了嗎？"],
   ["你回來了。","任務不會自己完成，趕快出發吧。"],
@@ -58,16 +60,22 @@ const MSG_NONE = ["今日任務：0 完成。","冒險者呢？任務還在等�
 const MSG_URG  = ["緊急任務尚未解決！","先清掉紅色的再說，其他等你。"];
 const EMPTY_F  = { name:"", cat:"health", freq:"everyday", wdays:[], date:"", mday:1, urgent:false };
 
-function todayKey() { return new Date().toISOString().split("T")[0]; }
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function localDateStr(d) {
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
 function getWeekdays() {
   const t = new Date(), m = new Date(t);
   m.setDate(t.getDate() - ((t.getDay()+6)%7));
-  return Array.from({length:7},(_,i)=>{ const d=new Date(m); d.setDate(m.getDate()+i); return d.toISOString().split("T")[0]; });
+  return Array.from({length:7},(_,i)=>{ const d=new Date(m); d.setDate(m.getDate()+i); return localDateStr(d); });
 }
 function getNextWeekdays() {
   const t = new Date(), m = new Date(t);
   m.setDate(t.getDate() - ((t.getDay()+6)%7) + 7);
-  return Array.from({length:7},(_,i)=>{ const d=new Date(m); d.setDate(m.getDate()+i); return d.toISOString().split("T")[0]; });
+  return Array.from({length:7},(_,i)=>{ const d=new Date(m); d.setDate(m.getDate()+i); return localDateStr(d); });
 }
 function scheduledOn(h, dk) {
   const d = new Date(dk+"T00:00:00");
@@ -124,6 +132,13 @@ function App() {
   const [calY, setCalY]       = useState(new Date().getFullYear());
   const [calM, setCalM]       = useState(new Date().getMonth());
   const [randMsg]             = useState(MSGS[Math.floor(Math.random()*MSGS.length)]);
+  // Notion shared task system
+  const [player, setPlayer]   = useState(()=>localStorage.getItem("k-player")||"");
+  const [ntasks, setNtasks]   = useState([]);
+  const [nrecords, setNrecords] = useState([]);
+  const [nscores, setNscores] = useState([]);
+  const [nloading, setNloading] = useState(false);
+  const [nerror, setNerror]   = useState("");
 
   useEffect(()=>{
     try {
@@ -135,6 +150,64 @@ function App() {
   function persist(h, d) {
     try { localStorage.setItem(SK, JSON.stringify({habits:h, done:d})); } catch(e) {}
   }
+
+  // ── Notion API helpers ──
+  async function fetchNtasks() {
+    try {
+      setNloading(true); setNerror("");
+      const r = await fetch(WORKER+"/tasks");
+      const d = await r.json();
+      setNtasks(d);
+    } catch(e) { setNerror("無法連接伺服器"); }
+    finally { setNloading(false); }
+  }
+  async function fetchNrecords() {
+    try {
+      const r = await fetch(WORKER+"/records?date="+todayKey());
+      const d = await r.json();
+      setNrecords(Array.isArray(d)?d:[]);
+    } catch(e) {}
+  }
+  async function fetchNscores() {
+    try {
+      const r = await fetch(WORKER+"/scores");
+      const d = await r.json();
+      setNscores(Array.isArray(d)?d:[]);
+    } catch(e) {}
+  }
+  async function claimTask(task) {
+    try {
+      await fetch(WORKER+"/records", { method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({player, taskId:task.id, taskName:task.name, score:task.score})
+      });
+      await fetchNrecords();
+    } catch(e) { setNerror("認領失敗，請重試"); }
+  }
+  async function completeTask(record) {
+    try {
+      await fetch(WORKER+"/records/"+record.id, { method:"PATCH",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({status:"已完成", player:record.player, score:record.score})
+      });
+      await Promise.all([fetchNrecords(), fetchNscores()]);
+    } catch(e) { setNerror("更新失敗，請重試"); }
+  }
+  async function abandonTask(record) {
+    try {
+      await fetch(WORKER+"/records/"+record.id, { method:"PATCH",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({status:"放棄", player:record.player, score:0})
+      });
+      await fetchNrecords();
+    } catch(e) {}
+  }
+
+  useEffect(()=>{
+    if(page==="chores") {
+      fetchNtasks(); fetchNrecords(); fetchNscores();
+    }
+  },[page]);
 
   const tk = todayKey();
   const wk = getWeekdays();
@@ -197,7 +270,7 @@ function App() {
   const s = {
     app:{ maxWidth:480, margin:"0 auto", minHeight:"100dvh", paddingBottom:72, background:"#f0f4f8", fontFamily:"'Noto Sans TC','Hiragino Sans',sans-serif", WebkitFontSmoothing:"antialiased" },
     navOuter:{ position:"fixed", bottom:0, left:0, right:0, background:"#fff", borderTop:"1.5px solid #dde4ed", zIndex:150 },
-    navInner:{ maxWidth:480, margin:"0 auto", display:"flex", height:56, paddingBottom:"env(safe-area-inset-bottom)" },
+    navInner:{ maxWidth:480, margin:"0 auto", display:"flex", height:60, paddingBottom:"env(safe-area-inset-bottom)" },
     navBtn:(on)=>({ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2, background:"none", border:"none", cursor:"pointer", fontFamily:"inherit" }),
     navLbl:(on)=>({ fontSize:10, fontWeight:700, color: on?"#1a2333":"#7a8fa6" }),
     hdr:{ padding:"44px 20px 0" },
@@ -246,7 +319,7 @@ function App() {
     const cells = [];
     for(let i=0;i<first;i++) cells.push(null);
     for(let d=1;d<=days;d++) cells.push(d);
-    function dk(d){ return calY+"-"+String(calM+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"); }
+    function dk(d){ return localDateStr(new Date(calY,calM,d)); }
     return (
       <div style={s.cal}>
         <div style={s.calHdr}>
@@ -555,6 +628,165 @@ function App() {
   }
 
 
+
+  // ── Chores Page (Notion shared tasks) ──
+  function ChoresPage() {
+    // Player selection screen
+    if(!player) return (
+      <div style={{padding:"60px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:20}}>
+        <img src={K_IMG} style={{width:90,height:100,objectFit:"contain",animation:"bob 3s ease-in-out infinite"}} alt="小K"/>
+        <div style={{background:"#1a2333",color:"#f0f4f8",borderRadius:16,padding:"14px 18px",fontSize:14,fontWeight:600,lineHeight:1.6,textAlign:"center",maxWidth:280}}>
+          <strong>小K：</strong>你是哪位冒險者？<br/>
+          <span style={{fontWeight:400,opacity:.75}}>選好後才能認領任務喔！</span>
+        </div>
+        <div style={{display:"flex",gap:12,marginTop:8}}>
+          {PLAYERS.map(p=>(
+            <button key={p} onClick={()=>{ localStorage.setItem("k-player",p); setPlayer(p); }}
+              style={{padding:"16px 28px",borderRadius:16,border:"none",background:"#1a2333",
+                color:"#f0f4f8",fontSize:16,fontWeight:900,cursor:"pointer",
+                boxShadow:"0 4px 20px rgba(26,35,51,.2)"}}>
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+
+    const tk = todayKey();
+    // Tasks already claimed today (by anyone)
+    const claimedIds = nrecords.map(r=>r.taskId);
+    // My claimed tasks today
+    const myRecords = nrecords.filter(r=>r.player===player);
+    // Available tasks = not yet claimed by anyone
+    const availTasks = ntasks.filter(t=>!claimedIds.includes(t.id));
+    // Score summary
+    const myScore = nscores.find(s=>s.player===player);
+    const otherScore = nscores.find(s=>s.player!==player);
+    const typeIcon = {"家事":"🧹","採買":"🛒","料理":"🍳","其他":"📦"};
+
+    return (<>
+      <div style={{padding:"44px 20px 0"}}>
+        {/* 小K + 玩家切換 */}
+        <div style={{display:"flex",alignItems:"stretch",gap:12,marginBottom:16}}>
+          <img src={K_IMG} style={{width:72,height:82,objectFit:"contain",animation:"bob 3s ease-in-out infinite",flexShrink:0}} alt="小K"/>
+          <div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{background:"#1a2333",color:"#f0f4f8",borderRadius:"14px 14px 14px 4px",
+              padding:"10px 14px",fontSize:13,fontWeight:600,lineHeight:1.5}}>
+              <strong>小K：</strong>
+              {myRecords.filter(r=>r.status==="已完成").length > 0
+                ? `${player} 已完成 ${myRecords.filter(r=>r.status==="已完成").length} 個任務，繼續衝！`
+                : `${player}，今天還沒完成任何任務喔！`}
+            </div>
+            <button onClick={()=>{ localStorage.removeItem("k-player"); setPlayer(""); }}
+              style={{alignSelf:"flex-start",background:"#eff2f6",border:"none",borderRadius:8,
+                padding:"4px 10px",fontSize:11,fontWeight:700,color:"#7a8fa6",cursor:"pointer"}}>
+              切換玩家 ↩
+            </button>
+          </div>
+        </div>
+
+        {/* 積分板 */}
+        <div style={{display:"flex",gap:10,marginBottom:16}}>
+          {[myScore, otherScore].filter(Boolean).map(s=>(
+            <div key={s.player} style={{flex:1,background: s.player===player?"#1a2333":"#fff",
+              border:"1.5px solid "+(s.player===player?"#1a2333":"#dde4ed"),
+              borderRadius:16,padding:"12px 14px",textAlign:"center"}}>
+              <div style={{fontSize:11,fontWeight:700,color:s.player===player?"#f0f4f8":"#7a8fa6",marginBottom:4}}>
+                {s.player===player?"👤 "+s.player:"👤 "+s.player}
+                {s.player===player&&<span style={{fontSize:9,opacity:.6}}> (我)</span>}
+              </div>
+              <div style={{fontSize:22,fontWeight:900,color:s.player===player?"#4ade80":"#1a2333"}}>{s.totalScore||0}</div>
+              <div style={{fontSize:10,color:s.player===player?"#f0f4f8":"#7a8fa6",opacity:.7}}>累計積分</div>
+              <div style={{fontSize:11,color:s.player===player?"#a3e6c3":"#3b82f6",marginTop:2,fontWeight:700}}>本月 {s.monthScore||0} 分</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {nerror && (
+        <div style={{margin:"0 20px 10px",padding:"12px 14px",background:"#fff5f5",border:"1.5px solid #f5c6c6",borderRadius:12}}>
+          <div style={{fontSize:12,color:"#c0392b",marginBottom:6}}>{nerror}</div>
+          <button onClick={()=>{ setNerror(""); fetchNtasks(); fetchNrecords(); fetchNscores(); }}
+            style={{fontSize:11,fontWeight:700,background:"#c0392b",color:"#fff",border:"none",
+              borderRadius:7,padding:"5px 12px",cursor:"pointer"}}>重新連接</button>
+        </div>
+      )}
+
+      {/* 我的進行中任務 */}
+      {myRecords.filter(r=>r.status==="認領中").length>0 && (
+        <div style={{padding:"0 20px",marginBottom:4}}>
+          <div style={{fontSize:11,fontWeight:900,color:"#c47d0e",letterSpacing:1,marginBottom:8,padding:"4px 0"}}>⚡ 進行中的任務</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {myRecords.filter(r=>r.status==="認領中").map(record=>(
+              <div key={record.id} style={{background:"#fdf3e0",border:"1.5px solid #f5c6a0",borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700}}>{record.taskName}</div>
+                  <div style={{fontSize:11,color:"#c47d0e",marginTop:2}}>+{record.score} 積分</div>
+                </div>
+                <button onClick={()=>completeTask(record)}
+                  style={{padding:"7px 14px",borderRadius:10,border:"none",background:"#2d7a4f",
+                    color:"#fff",fontSize:12,fontWeight:900,cursor:"pointer"}}>完成 ✓</button>
+                <button onClick={()=>abandonTask(record)}
+                  style={{padding:"7px 10px",borderRadius:10,border:"1.5px solid #dde4ed",
+                    background:"transparent",color:"#b8c5d4",fontSize:12,cursor:"pointer"}}>放棄</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 今日認領紀錄（已完成） */}
+      {nrecords.filter(r=>r.status==="已完成").length>0 && (
+        <div style={{padding:"12px 20px 0"}}>
+          <div style={{fontSize:11,fontWeight:900,color:"#2d7a4f",letterSpacing:1,marginBottom:8}}>✅ 今日完成</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {nrecords.filter(r=>r.status==="已完成").map(r=>(
+              <div key={r.id} style={{background:"#f7fdf9",border:"1.5px solid #bbf7d0",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:13,fontWeight:700,flex:1,color:"#7a8fa6",textDecoration:"line-through"}}>{r.taskName}</span>
+                <span style={{fontSize:11,color:"#2d7a4f",fontWeight:700}}>+{r.score}</span>
+                <span style={{fontSize:11,color:"#b8c5d4"}}>{r.player}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 可認領任務 */}
+      <div style={{padding:"12px 20px 0"}}>
+        <div style={{fontSize:11,fontWeight:900,color:"#1a2333",letterSpacing:1,marginBottom:8}}>
+          📋 今日可認領任務 {nloading&&"載入中..."}
+        </div>
+        {availTasks.length===0 && !nloading ? (
+          <div style={{textAlign:"center",padding:"28px 0",border:"1.5px dashed #dde4ed",borderRadius:16}}>
+            <div style={{fontSize:13,color:"#7a8fa6"}}>所有任務都被認領了！🎉</div>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {availTasks.map(task=>(
+              <div key={task.id} style={{background:"#fff",border:"1.5px solid #dde4ed",borderRadius:14,padding:"13px 14px",display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:22,flexShrink:0}}>{typeIcon[task.type]||"📌"}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700}}>{task.name}</div>
+                  <div style={{fontSize:11,color:"#7a8fa6",marginTop:2,display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{background:"#eff2f6",padding:"1px 6px",borderRadius:5,fontSize:10,fontWeight:600}}>{task.type}</span>
+                    <span style={{background:"#e8f5ee",color:"#2d7a4f",padding:"1px 6px",borderRadius:5,fontSize:10,fontWeight:700}}>+{task.score} 分</span>
+                    <span>{task.desc}</span>
+                  </div>
+                </div>
+                <button onClick={()=>claimTask(task)}
+                  style={{padding:"8px 14px",borderRadius:10,border:"none",background:"#1a2333",
+                    color:"#f0f4f8",fontSize:12,fontWeight:900,cursor:"pointer",flexShrink:0}}>
+                  認領
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{height:20}}/>
+    </>);
+  }
+
   // ── Achieve Page ──
   function AchievePage() {
     const now = new Date();
@@ -566,7 +798,7 @@ function App() {
     // 取得這個月所有日期
     const daysInMonth = new Date(year,month+1,0).getDate();
     const allDays = Array.from({length:daysInMonth},(_,i)=>{
-      return year+"-"+String(month+1).padStart(2,"0")+"-"+String(i+1).padStart(2,"0");
+      const d=new Date(year,month,i+1); return localDateStr(d);
     });
 
     // 計算每個任務本月的完成狀況
@@ -693,20 +925,24 @@ function App() {
         @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
         @keyframes barFill{from{width:0}to{width:var(--bar-w)}}
       `}</style>
-      {page==="home" ? <HomePage/> : page==="manage" ? <ManagePage/> : <AchievePage/>}
+      {page==="home" ? <HomePage/> : page==="manage" ? <ManagePage/> : page==="chores" ? <ChoresPage/> : <AchievePage/>}
       <div style={s.navOuter}>
         <div style={s.navInner}>
+          <button style={s.navBtn(page==="chores")} onClick={()=>setPage("chores")}>
+            <span style={{fontSize:20}}>🏠</span>
+            <span style={s.navLbl(page==="chores")}>團隊任務</span>
+          </button>
           <button style={s.navBtn(page==="home")} onClick={()=>setPage("home")}>
             <span style={{fontSize:20}}>📋</span>
-            <span style={s.navLbl(page==="home")}>任務公告欄</span>
-          </button>
-          <button style={s.navBtn(page==="manage")} onClick={()=>setPage("manage")}>
-            <span style={{fontSize:20}}>⚙️</span>
-            <span style={s.navLbl(page==="manage")}>任務管理</span>
+            <span style={s.navLbl(page==="home")}>個人任務</span>
           </button>
           <button style={s.navBtn(page==="achieve")} onClick={()=>setPage("achieve")}>
             <span style={{fontSize:20}}>🏆</span>
             <span style={s.navLbl(page==="achieve")}>成就</span>
+          </button>
+          <button style={s.navBtn(page==="manage")} onClick={()=>setPage("manage")}>
+            <span style={{fontSize:20}}>⚙️</span>
+            <span style={s.navLbl(page==="manage")}>管理</span>
           </button>
         </div>
       </div>
