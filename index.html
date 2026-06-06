@@ -210,7 +210,8 @@ function App(){
   }
 
   function completeTask(record){
-    fetch(WORKER+"/records/"+record.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:"已完成",player:record.player,score:record.score})})
+    var payload = {status:"已完成",player:record.player,score:record.score};
+    fetch(WORKER+"/records/"+record.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
     .then(function(){
       return Promise.all([
         fetch(WORKER+"/records?date="+todayKey()).then(function(x){return x.json();}),
@@ -406,7 +407,35 @@ function App(){
   function TeamPage(){
     var claimedIds=nrecords.map(function(r){return r.taskId;});
     var myRecords=nrecords.filter(function(r){return r.player===name;});
-    var availTasks=ntasks.filter(function(t){return!claimedIds.includes(t.id);});
+    // 判斷任務是否已被認領（考慮週期）
+    function isTaskClaimed(task) {
+      var tk2 = todayKey();
+      var now = new Date();
+      return nrecords.some(function(r) {
+        if (r.taskId !== task.id) return false;
+        if (r.status === "放棄") return false;
+        // 已完成且是每日/每週/每月任務：判斷是否在同一個週期內
+        if (r.status === "已完成") {
+          var rDate = new Date(r.date + "T00:00:00");
+          if (task.period === "每日") return r.date === tk2;
+          if (task.period === "每週") {
+            // 同一週
+            var startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - ((now.getDay()+6)%7));
+            startOfWeek.setHours(0,0,0,0);
+            return rDate >= startOfWeek;
+          }
+          if (task.period === "每月") {
+            return rDate.getFullYear() === now.getFullYear() && rDate.getMonth() === now.getMonth();
+          }
+          if (task.period === "單次") return true;
+        }
+        // 認領中：直接佔用
+        if (r.status === "認領中") return true;
+        return false;
+      });
+    }
+    var availTasks = ntasks.filter(function(t){ return !isTaskClaimed(t); });
     var allSc=nscores.length>0?nscores.slice().sort(function(a,b){return a.player===name?-1:b.player===name?1:0;}):[{player:name,totalScore:0,monthScore:0}];
     var myDone=myRecords.filter(function(r){return r.status==="已完成";}).length;
     var myPending=myRecords.filter(function(r){return r.status==="認領中";});
