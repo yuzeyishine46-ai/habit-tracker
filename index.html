@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="小K助理"/>
+<meta name="apple-mobile-web-app-title" content="K任務"/>
 <meta name="theme-color" content="#f0f4f8"/>
-<title>小K助理</title>
+<title>K任務</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -179,6 +179,7 @@ function App(){
   var s20=useState(""),inputId=s20[0],setInputId=s20[1];
   var s21=useState(false),editingId=s21[0],setEditingId=s21[1];
   var s22=useState(""),newIdInput=s22[0],setNewIdInput=s22[1];
+  var s23=useState(false),resetModal=s23[0],setResetModal=s23[1];
 
   useEffect(function(){
     try{var r=localStorage.getItem(SK);if(r){var d=JSON.parse(r);setHabits(d.habits||[]);setDone(d.done||{});}}catch(ex){}
@@ -777,40 +778,59 @@ function App(){
       e("div",{style:{padding:"24px 20px 0"}},
         e("div",{style:{borderTop:"1.5px solid "+C.bdr,paddingTop:20}},
           e("div",{style:{fontSize:11,fontWeight:900,color:C.mut,letterSpacing:2,marginBottom:10}},"⚠️ 危險區域"),
-          e("div",{style:{display:"flex",flexDirection:"column",gap:10}},
-            e("div",{style:Object.assign({},cs("#f5c6c6"),{background:"#fff5f5"})},
-              e("div",{style:{fontSize:13,fontWeight:700,color:C.red,marginBottom:4}},"重置個人資料"),
-              e("div",{style:{fontSize:12,color:C.mut,lineHeight:1.5,marginBottom:12}},
-                "清除「"+gameId+"」的個人任務、完成記錄、認領紀錄、積分。不影響其他玩家。"
-              ),
-              e("button",{
-                onClick:function(){
-                  if(!window.confirm("確定要重置「"+gameId+"」的所有資料嗎？此動作無法復原。")) return;
-                  var pid=gameId;
-                  fetch(WORKER+"/reset",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:pid})})
-                  .finally(function(){localStorage.clear();window.location.reload();});
-                },
-                style:{width:"100%",padding:"12px",borderRadius:12,border:"none",background:C.red,color:"#fff",fontSize:13,fontWeight:900,fontFamily:"inherit",cursor:"pointer"}
-              },"🗑️ 重置我的資料（"+gameId+"）")
-            ),
-            e("div",{style:Object.assign({},cs("#f5c6c6"),{background:"#fff5f5"})},
-              e("div",{style:{fontSize:13,fontWeight:700,color:"#7f1d1d",marginBottom:4}},"重置所有人的資料"),
-              e("div",{style:{fontSize:12,color:C.mut,lineHeight:1.5,marginBottom:12}},
-                "清除所有玩家的認領紀錄和積分，以及本機的個人任務和遊戲 ID。"
-              ),
-              e("button",{
-                onClick:function(){
-                  if(!window.confirm("確定要重置所有玩家的資料嗎？此動作無法復原。")) return;
-                  fetch(WORKER+"/reset-all",{method:"DELETE",headers:{"Content-Type":"application/json"}})
-                  .finally(function(){localStorage.clear();window.location.reload();});
-                },
-                style:{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"#7f1d1d",color:"#fff",fontSize:13,fontWeight:900,fontFamily:"inherit",cursor:"pointer"}
-              },"☢️ 重置所有人的資料")
-            )
-          )
+          e("button",{
+            onClick:function(){setResetModal(true);},
+            style:{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #f5c6c6",background:"#fff5f5",color:C.red,fontSize:13,fontWeight:900,fontFamily:"inherit",cursor:"pointer"}
+          },"🗑️ 重置資料")
         )
       ),
       e("div",{style:{height:20}})
+    );
+  }
+
+  function ResetModal(){
+    function doReset(all){
+      var msg = all ? "確定要重置所有玩家的資料嗎？" : "確定要重置「"+gameId+"」的資料嗎？";
+      if(!window.confirm(msg+"此動作無法復原。")) return;
+      setResetModal(false);
+      if(all){
+        fetch(WORKER+"/reset-all",{method:"DELETE",headers:{"Content-Type":"application/json"}})
+        .finally(function(){localStorage.clear();window.location.reload();});
+      } else {
+        fetch(WORKER+"/reset",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:gameId})})
+        .finally(function(){localStorage.clear();window.location.reload();});
+      }
+    }
+    return e("div",{style:mBg,onClick:function(ev){if(ev.target===ev.currentTarget)setResetModal(false);}},
+      e("div",{style:mBox},
+        e("div",{style:{display:"flex",alignItems:"center",gap:11,marginBottom:20}},
+          kImg(42,47),
+          e("div",null,
+            e("div",{style:{fontSize:16,fontWeight:900}},"重置資料"),
+            e("div",{style:{fontSize:12,color:C.mut,marginTop:2}},"選擇要重置的範圍")
+          )
+        ),
+        e("div",{style:{display:"flex",flexDirection:"column",gap:10}},
+          e("button",{
+            onClick:function(){doReset(false);},
+            style:{width:"100%",padding:"14px",borderRadius:13,border:"1.5px solid #f5c6c6",background:"#fff5f5",textAlign:"left",cursor:"pointer",fontFamily:"inherit"}
+          },
+            e("div",{style:{fontSize:14,fontWeight:900,color:C.red,marginBottom:3}},"🗑️ 重置我的資料（"+gameId+"）"),
+            e("div",{style:{fontSize:12,color:C.mut}},"清除個人任務、完成記錄、認領紀錄、積分。不影響其他玩家。")
+          ),
+          e("button",{
+            onClick:function(){doReset(true);},
+            style:{width:"100%",padding:"14px",borderRadius:13,border:"1.5px solid #fca5a5",background:"#fff5f5",textAlign:"left",cursor:"pointer",fontFamily:"inherit"}
+          },
+            e("div",{style:{fontSize:14,fontWeight:900,color:"#7f1d1d",marginBottom:3}},"☢️ 重置所有人的資料"),
+            e("div",{style:{fontSize:12,color:C.mut}},"清除所有玩家的認領紀錄、積分，以及本機所有資料。")
+          ),
+          e("button",{
+            onClick:function(){setResetModal(false);},
+            style:{width:"100%",padding:"12px",borderRadius:13,border:"1.5px solid "+C.bdr,background:"transparent",color:C.mut,fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer"}
+          },"取消")
+        )
+      )
     );
   }
 
@@ -829,7 +849,8 @@ function App(){
       )
     ),
     modal2?e(HabitModal):null,
-    teamModal?e(TeamModalComp):null
+    teamModal?e(TeamModalComp):null,
+    resetModal?e(ResetModal):null
   );
 }
 
