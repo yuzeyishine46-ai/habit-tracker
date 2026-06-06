@@ -835,10 +835,10 @@ function App(){
   }
 
   var navItems=[["team","🏠","團隊任務"],["personal","📋","個人任務"],["achieve","🏆","成就"],["manage","⚙️","管理"]];
-  return e("div",{style:{maxWidth:480,margin:"0 auto",minHeight:"100dvh",paddingBottom:76,background:C.bg,fontFamily:"'Noto Sans TC','Hiragino Sans',sans-serif",WebkitFontSmoothing:"antialiased"}},
+  return e("div",{style:{maxWidth:480,margin:"0 auto",minHeight:"100dvh",paddingBottom:"calc(76px + env(safe-area-inset-bottom))",background:C.bg,fontFamily:"'Noto Sans TC','Hiragino Sans',sans-serif",WebkitFontSmoothing:"antialiased"}},
     page==="team"?e(TeamPage):page==="personal"?e(PersonalPage):page==="achieve"?e(AchievePage):e(ManagePage),
     e("div",{style:{position:"fixed",bottom:0,left:0,right:0,background:C.sur,borderTop:"1.5px solid "+C.bdr,zIndex:150}},
-      e("div",{style:{maxWidth:480,margin:"0 auto",display:"flex",height:60,paddingBottom:"env(safe-area-inset-bottom)"}},
+      e("div",{style:{maxWidth:480,margin:"0 auto",display:"flex",height:"calc(60px + env(safe-area-inset-bottom))",alignItems:"flex-start",paddingBottom:"env(safe-area-inset-bottom)"}},
         navItems.map(function(item){
           var on=page===item[0];
           return e("button",{key:item[0],style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"},onClick:function(){setPage(item[0]);}},
