@@ -777,13 +777,42 @@ function App(){
       e("div",{style:{padding:"24px 20px 0"}},
         e("div",{style:{borderTop:"1.5px solid "+C.bdr,paddingTop:20}},
           e("div",{style:{fontSize:11,fontWeight:900,color:C.mut,letterSpacing:2,marginBottom:10}},"⚠️ 危險區域"),
-          e("div",{style:Object.assign({},cs("#f5c6c6"),{background:"#fff5f5",marginBottom:8})},
-            e("div",{style:{fontSize:13,fontWeight:700,color:C.red,marginBottom:4}},"重置所有資料"),
-            e("div",{style:{fontSize:12,color:C.mut,lineHeight:1.5,marginBottom:12}},"清除所有個人任務、完成記錄、遊戲 ID。團隊任務資料保留在 Notion，不受影響。"),
+          // 個人重置
+          e("div",{style:Object.assign({},cs("#f5c6c6"),{background:"#fff5f5",marginBottom:10})},
+            e("div",{style:{fontSize:13,fontWeight:700,color:C.red,marginBottom:4}},"重置個人資料"),
+            e("div",{style:{fontSize:12,color:C.mut,lineHeight:1.5,marginBottom:12}},
+              "清除「"+gameId+"」的個人任務、完成記錄、認領紀錄、積分。不影響其他玩家。"
+            ),
             e("button",{
-              onClick:function(){if(window.confirm("確定要重置所有資料嗎？此動作無法復原。")){localStorage.clear();window.location.reload();}},
+              onClick:function(){
+                if(!window.confirm("確定要重置「"+gameId+"」的所有資料嗎？此動作無法復原。")) return;
+                var pid = gameId;
+                fetch(WORKER+"/reset",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({player:pid})})
+                .finally(function(){
+                  localStorage.clear();
+                  window.location.reload();
+                });
+              },
               style:{width:"100%",padding:"12px",borderRadius:12,border:"none",background:C.red,color:"#fff",fontSize:13,fontWeight:900,fontFamily:"inherit",cursor:"pointer"}
-            },"🗑️ 重置所有資料")
+            },"🗑️ 重置我的資料（"+gameId+"）")
+          ),
+          // 全體重置
+          e("div",{style:Object.assign({},cs("#f5c6c6"),{background:"#fff5f5",marginBottom:8})},
+            e("div",{style:{fontSize:13,fontWeight:700,color:C.red,marginBottom:4}},"重置所有人的資料"),
+            e("div",{style:{fontSize:12,color:C.mut,lineHeight:1.5,marginBottom:12}},
+              "清除所有玩家的認領紀錄和積分，以及本機的個人任務和遊戲 ID。"
+            ),
+            e("button",{
+              onClick:function(){
+                if(!window.confirm("確定要重置所有玩家的資料嗎？此動作無法復原。")) return;
+                fetch(WORKER+"/reset-all",{method:"DELETE",headers:{"Content-Type":"application/json"}})
+                .finally(function(){
+                  localStorage.clear();
+                  window.location.reload();
+                });
+              },
+              style:{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"#7f1d1d",color:"#fff",fontSize:13,fontWeight:900,fontFamily:"inherit",cursor:"pointer"}
+            },"☢️ 重置所有人的資料")
           )
         )
       ),
